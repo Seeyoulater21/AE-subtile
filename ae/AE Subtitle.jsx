@@ -265,6 +265,11 @@ Dockable ScriptUI panel for generating editable subtitle text layers from the ac
         if (!transcript.segments || transcript.segments.length === 0) {
             throw new Error("Transcript contains no subtitle segments.");
         }
+        for (var index = 0; index < transcript.segments.length; index += 1) {
+            if (!transcript.segments[index].text || String(transcript.segments[index].text).replace(/\s/g, "") === "") {
+                throw new Error("Transcript segment " + (index + 1) + " has no visible text.");
+            }
+        }
     }
 
     function rebuildSubtitleLayers(comp, segments) {
@@ -289,21 +294,49 @@ Dockable ScriptUI panel for generating editable subtitle text layers from the ac
         textLayer.name = SUBTITLE_PREFIX + padNumber(number, 3);
         textLayer.inPoint = Number(segment.start);
         textLayer.outPoint = Number(segment.end);
-        applySubtitleStyle(textLayer, comp);
+        applySubtitleStyle(textLayer, comp, segment);
+        textLayer.moveToBeginning();
     }
 
-    function applySubtitleStyle(textLayer, comp) {
+    function applySubtitleStyle(textLayer, comp, segment) {
         var textProp = textLayer.property("Source Text");
         var textDocument = textProp.value;
+        textDocument.text = String(segment.text);
+        textDocument.font = chooseSubtitleFont();
         textDocument.justification = ParagraphJustification.CENTER_JUSTIFY;
-        textDocument.fontSize = Math.max(28, Math.round(comp.height * 0.055));
+        textDocument.fontSize = Math.max(42, Math.round(comp.height * 0.075));
         textDocument.applyFill = true;
         textDocument.fillColor = [1, 1, 1];
         textDocument.applyStroke = true;
         textDocument.strokeColor = [0, 0, 0];
-        textDocument.strokeWidth = Math.max(3, Math.round(comp.height * 0.004));
+        textDocument.strokeWidth = Math.max(5, Math.round(comp.height * 0.006));
+        textDocument.strokeOverFill = false;
         textProp.setValue(textDocument);
-        textLayer.property("Transform").property("Position").setValue([comp.width / 2, comp.height * 0.84]);
+
+        var transform = textLayer.property("Transform");
+        transform.property("Scale").setValue([100, 100]);
+        transform.property("Rotation").setValue(0);
+        transform.property("Opacity").setValue(100);
+
+        var sourceRect = textLayer.sourceRectAtTime(textLayer.inPoint, false);
+        transform.property("Anchor Point").setValue([
+            sourceRect.left + sourceRect.width / 2,
+            sourceRect.top + sourceRect.height / 2
+        ]);
+        transform.property("Position").setValue([comp.width / 2, comp.height * 0.82]);
+    }
+
+    function chooseSubtitleFont() {
+        var candidates = ["SukhumvitSet-Text", "Thonburi", "Ayuthaya", "ArialMT", "Helvetica"];
+        for (var index = 0; index < candidates.length; index += 1) {
+            try {
+                var testDocument = new TextDocument("test");
+                testDocument.font = candidates[index];
+                return candidates[index];
+            } catch (ignored) {
+            }
+        }
+        return "ArialMT";
     }
 
     function padNumber(value, width) {
