@@ -35,6 +35,7 @@ Provide a very lightweight After Effects tool that generates normal subtitle tex
 - Thai and English transcript support.
 - Sidecar transcript cache next to the source file.
 - Transcript JSON contract with source fingerprint and timed segments.
+- Campaign glossary correction from editable Markdown before writing the transcript cache.
 - Ordinary After Effects text layers with `inPoint` and `outPoint` matching transcript segment timing.
 - Bottom-centered subtitle style with readable defaults.
 - Safe rebuild behavior that deletes only layers named `SUB *`.
@@ -98,6 +99,7 @@ Acceptance criteria:
 - Re-running generation does not duplicate subtitle layers.
 - Existing non-subtitle layers remain unchanged.
 - Cached transcript reuse avoids re-transcribing unchanged source media.
+- Campaign glossary terms can correct common Thai/English brand, promotion, and near-match recognition errors.
 - Generated layers are normal After Effects text layers that the user can edit manually.
 
 ## Assumptions
@@ -116,5 +118,6 @@ Acceptance criteria:
 | AE cannot read source files from some layer types | No transcription source | Validate imported audio/video layer only; show clear error |
 | Whisper setup is heavy for a "lightweight" script | Install friction | Keep AE side tiny; isolate transcription in Python helper |
 | Thai segmentation creates awkward long lines | Poor readability | Add conservative line wrapping without changing timing |
+| Thai campaign keywords are misrecognized | Wrong brand or promotion terms | Apply editable `glossary.md` corrections after transcription |
 | Cache becomes stale | Wrong subtitles | Store source size and modified time in JSON |
 | Rebuild deletes wrong layers | User data loss | Delete only names matching `SUB ` prefix |

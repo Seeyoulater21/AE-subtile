@@ -10,6 +10,7 @@ from aesubtitle.cache import (
     transcript_cache_path,
     write_transcript_atomic,
 )
+from aesubtitle.glossary import glossary_fingerprint
 
 
 class CacheTests(unittest.TestCase):
@@ -47,6 +48,34 @@ class CacheTests(unittest.TestCase):
 
             self.assertFalse(cache_matches_source(load_transcript(cache_path), source))
             self.assertFalse(cache_path.with_suffix(".tmp").exists())
+
+    def test_cache_matches_glossary_fingerprint_when_glossary_is_used(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "voice over.wav"
+            glossary = Path(temp_dir) / "campaign.md"
+            source.write_bytes(b"first")
+            glossary.write_text("- canonical: ทั่วไทย\n", encoding="utf-8")
+            transcript = {
+                "version": "1.0",
+                "source_file": source.name,
+                "source_path": str(source),
+                "source_fingerprint": source_fingerprint(source),
+                "glossary_fingerprint": glossary_fingerprint(glossary),
+                "duration_seconds": 1.0,
+                "language": "th",
+                "model": "fake",
+                "timebase": "source_seconds",
+                "segments": [{"id": 0, "start": 0.0, "end": 1.0, "text": "hello"}],
+            }
+            cache_path = transcript_cache_path(source)
+
+            write_transcript_atomic(cache_path, transcript)
+
+            self.assertTrue(cache_matches_source(load_transcript(cache_path), source, glossary))
+
+            glossary.write_text("- canonical: ทั่วไทย\n- canonical: Shopee Payday\n", encoding="utf-8")
+
+            self.assertFalse(cache_matches_source(load_transcript(cache_path), source, glossary))
 
 
 if __name__ == "__main__":

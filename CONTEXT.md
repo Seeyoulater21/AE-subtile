@@ -36,6 +36,10 @@ _Avoid_: caption object, subtitle file
 The sidecar `*.aesubtitle.json` file saved next to the Source Audio File so repeated generation can skip transcription when the source has not changed.
 _Avoid_: database, project cache
 
+**Campaign Glossary**:
+The editable `glossary.md` Markdown file that maps campaign keywords and common recognition mistakes to canonical subtitle text.
+_Avoid_: model training, dictionary database
+
 **Rebuild**:
 The safe repeat-generation behavior: delete only existing `SUB ` layers, then create fresh Subtitle Text Layers from the current Transcript.
 _Avoid_: sync, update in place

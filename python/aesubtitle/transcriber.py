@@ -8,6 +8,10 @@ from typing import Any
 
 from aesubtitle.text import clean_segment_text
 
+DEFAULT_MODEL = "large-v3"
+DEFAULT_COMPUTE_TYPE = "int8"
+DEFAULT_CONDITION_ON_PREVIOUS_TEXT = False
+
 
 class TranscriptionError(RuntimeError):
     pass
@@ -16,15 +20,17 @@ class TranscriptionError(RuntimeError):
 class FfmpegWhisperTranscriber:
     def __init__(
         self,
-        model: str = "small",
+        model: str = DEFAULT_MODEL,
         language: str | None = None,
         device: str = "auto",
-        compute_type: str = "default",
+        compute_type: str = DEFAULT_COMPUTE_TYPE,
+        condition_on_previous_text: bool = DEFAULT_CONDITION_ON_PREVIOUS_TEXT,
     ) -> None:
         self.model = model
         self.language = language
         self.device = device
         self.compute_type = compute_type
+        self.condition_on_previous_text = condition_on_previous_text
 
     def transcribe(self, source_path: str | Path) -> dict[str, Any]:
         source = Path(source_path)
@@ -46,6 +52,9 @@ class FfmpegWhisperTranscriber:
             segments, info = model.transcribe(
                 str(audio_path),
                 language=self.language,
+                beam_size=5,
+                temperature=0.0,
+                condition_on_previous_text=self.condition_on_previous_text,
                 vad_filter=True,
             )
             normalized = [

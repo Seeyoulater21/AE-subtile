@@ -21,7 +21,7 @@ def build_transcript(source_path: str | Path, transcription: dict[str, Any]) -> 
     for new_id, segment in enumerate(segments):
         segment["id"] = new_id
 
-    return {
+    transcript = {
         "version": TRANSCRIPT_VERSION,
         "source_file": source.name,
         "source_path": str(source),
@@ -32,6 +32,9 @@ def build_transcript(source_path: str | Path, transcription: dict[str, Any]) -> 
         "timebase": TIMEBASE,
         "segments": segments,
     }
+    if transcription.get("glossary_fingerprint") is not None:
+        transcript["glossary_fingerprint"] = transcription["glossary_fingerprint"]
+    return transcript
 
 
 def _normalize_segment(index: int, segment: dict[str, Any]) -> dict[str, Any]:

@@ -12,14 +12,16 @@ AE Subtitle creates ordinary After Effects text layers from speech in the active
 2. Open any After Effects comp that contains one imported voice-over audio/video layer.
 3. Click `Generate Subtitle` in the dockable ScriptUI panel.
 4. The panel calls the local Python server through `system.callSystem` and `curl`.
-5. The Python server transcribes the layer source file and writes a sidecar cache named `*.aesubtitle.json`.
+5. The Python server transcribes the layer source file, applies `glossary.md` campaign corrections, and writes a sidecar cache named `*.aesubtitle.json`.
 6. The JSX panel deletes existing layers whose names start with `SUB `.
 7. The JSX panel creates ordinary text layers, one per transcript segment, with matching `inPoint` and `outPoint`.
 
 ## MVP Defaults
 
 - After Effects UI: dockable `.jsx` ScriptUI panel.
-- Transcription: local Python server/CLI using ffmpeg plus a Whisper-compatible engine.
+- Transcription: local Python server/CLI using ffmpeg plus `faster-whisper`.
+- Model: `large-v3` with `int8` compute by default. Override with `AESUBTITLE_MODEL` or `--model`.
+- Campaign correction: root `glossary.md` maps model mistakes and near-matches to campaign keywords.
 - Source: first usable audio/video layer source file in the active comp. The comp name can be anything.
 - Cache: `*.aesubtitle.json` next to the source audio/video file.
 - Subtitle layers: `SUB 001`, `SUB 002`, etc.
@@ -31,14 +33,21 @@ AE Subtitle creates ordinary After Effects text layers from speech in the active
 
 1. Double-click `AE Subtitle.command`.
 2. The launcher checks Python, `aesubtitle`, `faster-whisper`, and `ffmpeg` before installing anything missing.
-3. Keep the launcher Terminal window open. It starts or adopts the local server at `http://127.0.0.1:8765`.
-4. Copy `ae/AE Subtitle.jsx` into the After Effects `Scripts/ScriptUI Panels` folder.
-5. Restart After Effects and open `Window > AE Subtitle`.
+3. Edit `glossary.md` for the current campaign words if needed.
+4. Keep the launcher Terminal window open. It starts or adopts the local server at `http://127.0.0.1:8765`.
+5. Copy `ae/AE Subtitle.jsx` into the After Effects `Scripts/ScriptUI Panels` folder.
+6. Restart After Effects and open `Window > AE Subtitle`.
 
 ## CLI Usage
 
 ```sh
 PYTHONPATH=python python3 -m aesubtitle transcribe "/path/to/voice over.wav"
+```
+
+Use another campaign glossary:
+
+```sh
+PYTHONPATH=python python3 -m aesubtitle transcribe "/path/to/voice over.wav" --glossary "/path/to/campaign.md"
 ```
 
 Server usage:
@@ -54,6 +63,7 @@ The CLI prints machine-readable JSON:
 ```
 
 Repeated runs reuse the sidecar transcript cache when source file size and modified time still match.
+When a glossary is used, changing that glossary invalidates the cache so corrected text can regenerate.
 
 ## Manual QA
 

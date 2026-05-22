@@ -6,6 +6,7 @@ import urllib.request
 from pathlib import Path
 
 from aesubtitle import server
+from aesubtitle.transcriber import DEFAULT_COMPUTE_TYPE, DEFAULT_MODEL
 
 
 class FakeTranscriber:
@@ -19,6 +20,13 @@ class FakeTranscriber:
 
 
 class ServerTests(unittest.TestCase):
+    def test_server_defaults_use_smarter_local_model_settings(self):
+        args = server.build_parser().parse_args([])
+
+        self.assertEqual(args.model, DEFAULT_MODEL)
+        self.assertEqual(args.compute_type, DEFAULT_COMPUTE_TYPE)
+        self.assertFalse(args.condition_on_previous_text)
+
     def test_transcribe_endpoint_returns_cache_path_json(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             source = Path(temp_dir) / "voice over.wav"

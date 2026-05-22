@@ -13,6 +13,7 @@ After Effects
 Python local server
   ffmpeg audio extraction
   Whisper-compatible transcription
+  campaign glossary correction
   sidecar JSON cache
     |
     v
@@ -54,6 +55,7 @@ Responsibilities:
 - Reuse sidecar cache when source fingerprint matches.
 - Extract audio with ffmpeg when needed.
 - Transcribe Thai and English speech with a local Whisper-compatible engine.
+- Apply editable campaign glossary corrections from Markdown.
 - Clean segment text.
 - Write transcript JSON atomically.
 - Print JSON path or machine-readable status for the JSX caller.
@@ -93,6 +95,11 @@ Contract:
   "duration_seconds": 30.0,
   "language": "th",
   "model": "large-v3",
+  "glossary_fingerprint": {
+    "path": "/path/to/glossary.md",
+    "size_bytes": 1234,
+    "modified_at": "2026-05-22T10:00:00Z"
+  },
   "timebase": "source_seconds",
   "segments": [
     {
@@ -104,6 +111,8 @@ Contract:
   ]
 }
 ```
+
+If `glossary.md` exists, the Python side applies it before writing the cache and stores its fingerprint. Changing the glossary invalidates the cache.
 
 ## Timing Model
 
@@ -121,6 +130,19 @@ Each transcript segment becomes one ordinary text layer:
 - Source text: wrapped segment text.
 - Position: bottom center.
 - Style: white fill, black stroke or shadow.
+
+## Campaign Glossary
+
+The root `glossary.md` file uses a small Markdown format:
+
+```md
+- canonical: Shopee Payday
+  variants:
+    - shopee payday
+    - ชอบพี่เพเด
+```
+
+`canonical` is the text that should appear in subtitles. `variants` are exact model mistakes or alternate spellings. After exact replacements, a conservative fuzzy pass can correct near Thai matches such as `ทั่วชัย` to `ทั่วไทย` when the glossary contains `ทั่วไทย`.
 
 ## Suggested Future File Structure
 

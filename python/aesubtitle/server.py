@@ -9,7 +9,7 @@ from typing import Callable
 from aesubtitle import __version__
 from aesubtitle.cli import transcribe_source
 from aesubtitle.models import TranscriptError
-from aesubtitle.transcriber import TranscriptionError
+from aesubtitle.transcriber import DEFAULT_COMPUTE_TYPE, DEFAULT_MODEL, TranscriptionError
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -19,19 +19,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ae-subtitle-server")
     parser.add_argument("--host", default=os.environ.get("AESUBTITLE_HOST", DEFAULT_HOST))
     parser.add_argument("--port", type=int, default=int(os.environ.get("AESUBTITLE_PORT", DEFAULT_PORT)))
-    parser.add_argument("--model", default=os.environ.get("AESUBTITLE_MODEL", "small"))
+    parser.add_argument("--model", default=os.environ.get("AESUBTITLE_MODEL", DEFAULT_MODEL))
     parser.add_argument("--language", default=os.environ.get("AESUBTITLE_LANGUAGE"))
     parser.add_argument("--device", default=os.environ.get("AESUBTITLE_DEVICE", "auto"))
-    parser.add_argument("--compute-type", default=os.environ.get("AESUBTITLE_COMPUTE_TYPE", "default"))
+    parser.add_argument("--compute-type", default=os.environ.get("AESUBTITLE_COMPUTE_TYPE", DEFAULT_COMPUTE_TYPE))
+    parser.add_argument("--glossary", default=os.environ.get("AESUBTITLE_GLOSSARY"))
+    parser.add_argument("--condition-on-previous-text", action="store_true")
     return parser
 
 
 def create_server(
     address: tuple[str, int] = (DEFAULT_HOST, DEFAULT_PORT),
-    model: str = "small",
+    model: str = DEFAULT_MODEL,
     language: str | None = None,
     device: str = "auto",
-    compute_type: str = "default",
+    compute_type: str = DEFAULT_COMPUTE_TYPE,
+    glossary: str | None = None,
+    condition_on_previous_text: bool = False,
     transcriber_factory: Callable[[argparse.Namespace], object] | None = None,
 ) -> ThreadingHTTPServer:
     config = {
@@ -39,6 +43,8 @@ def create_server(
         "language": language,
         "device": device,
         "compute_type": compute_type,
+        "glossary": glossary,
+        "condition_on_previous_text": condition_on_previous_text,
         "transcriber_factory": transcriber_factory,
     }
 
@@ -67,6 +73,8 @@ def create_server(
                     language=config["language"],
                     device=config["device"],
                     compute_type=config["compute_type"],
+                    glossary=config["glossary"],
+                    condition_on_previous_text=bool(config["condition_on_previous_text"]),
                     transcriber_factory=config["transcriber_factory"],
                 )
             except (OSError, TranscriptionError, TranscriptError, ValueError, json.JSONDecodeError) as error:
@@ -102,6 +110,8 @@ def main(argv: list[str] | None = None) -> int:
         language=args.language,
         device=args.device,
         compute_type=args.compute_type,
+        glossary=args.glossary,
+        condition_on_previous_text=args.condition_on_previous_text,
     )
     print(f"AE Subtitle server listening on http://{args.host}:{args.port}", flush=True)
     try:

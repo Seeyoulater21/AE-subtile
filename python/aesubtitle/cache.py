@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from aesubtitle.glossary import glossary_fingerprint
+
 
 def transcript_cache_path(source_path: str | Path) -> Path:
     source = Path(source_path)
@@ -37,8 +39,17 @@ def write_transcript_atomic(cache_path: str | Path, transcript: dict[str, Any]) 
     os.replace(temp_path, path)
 
 
-def cache_matches_source(transcript: dict[str, Any], source_path: str | Path) -> bool:
+def cache_matches_source(
+    transcript: dict[str, Any],
+    source_path: str | Path,
+    glossary_path: str | Path | None = None,
+) -> bool:
     try:
-        return transcript.get("source_fingerprint") == source_fingerprint(source_path)
+        if transcript.get("source_fingerprint") != source_fingerprint(source_path):
+            return False
+        if glossary_path is not None:
+            expected_glossary = glossary_fingerprint(glossary_path)
+            return transcript.get("glossary_fingerprint") == expected_glossary
+        return True
     except OSError:
         return False
