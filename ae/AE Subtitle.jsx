@@ -1,13 +1,13 @@
 /*
 AE Subtitle
-Dockable ScriptUI panel for generating editable subtitle text layers from a Voice-over comp.
+Dockable ScriptUI panel for generating editable subtitle text layers from the active comp.
 */
 
 (function aeSubtitlePanel(thisObj) {
     var SCRIPT_NAME = "AE Subtitle";
-    var SETTINGS_SECTION = "AE Subtitle";
+    var SERVER_URL = "http://127.0.0.1:8765";
     var SUBTITLE_PREFIX = "SUB ";
-    var VOICE_OVER_COMP_NAME = "Voice-over";
+    var MAX_NESTED_SOURCE_DEPTH = 3;
     var SUPPORTED_SOURCE_EXTENSIONS = {
         "aif": true,
         "aiff": true,
@@ -34,30 +34,11 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
         panel.margins = 12;
 
         var generateButton = panel.add("button", undefined, "Generate Subtitle");
-        var configGroup = panel.add("group");
-        configGroup.orientation = "row";
-        configGroup.alignChildren = ["fill", "center"];
-        var pythonButton = configGroup.add("button", undefined, "Python...");
-        var cliButton = configGroup.add("button", undefined, "CLI...");
         var statusText = panel.add("statictext", undefined, "Ready");
         statusText.characters = 34;
 
         generateButton.onClick = function () {
             runGenerate(statusText);
-        };
-        pythonButton.onClick = function () {
-            try {
-                choosePythonExecutable();
-            } catch (error) {
-                alert("AE Subtitle error:\n" + error.message);
-            }
-        };
-        cliButton.onClick = function () {
-            try {
-                chooseCliFile();
-            } catch (error) {
-                alert("AE Subtitle error:\n" + error.message);
-            }
         };
 
         panel.layout.layout(true);
@@ -71,16 +52,16 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
     function runGenerate(statusText) {
         try {
             statusText.text = "Finding source...";
-            var comp = getActiveVoiceOverComp();
-            var sourceLayer = findSourceLayer(comp);
-            validateLayerTiming(sourceLayer);
-            var sourceFile = sourceFileFromLayer(sourceLayer);
+            var comp = getActiveComp();
+            var sourceCandidate = findSourceCandidate(comp);
+            validateCandidateTiming(sourceCandidate);
+            var sourceFile = sourceCandidate.file;
             if (!sourceFile) {
                 throw new Error("No imported audio/video source file found in the active comp.");
             }
 
             statusText.text = "Transcribing...";
-            var result = runCli(sourceFile.fsName);
+            var result = requestTranscription(sourceFile.fsName);
             var transcript = readJsonFile(result.transcript_path);
             validateTranscript(transcript);
 
@@ -99,40 +80,53 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
         }
     }
 
-    function getActiveVoiceOverComp() {
+    function getActiveComp() {
         if (!app.project || !(app.project.activeItem instanceof CompItem)) {
-            throw new Error("Open the Voice-over comp before generating subtitles.");
+            throw new Error("Open a comp that contains the voice-over source before generating subtitles.");
         }
-        var comp = app.project.activeItem;
-        if (comp.name !== VOICE_OVER_COMP_NAME) {
-            var proceed = confirm("Active comp is \"" + comp.name + "\", not \"" + VOICE_OVER_COMP_NAME + "\".\nMVP timing uses source seconds from comp time 0. Continue?");
-            if (!proceed) {
-                throw new Error("Generation cancelled. Open the Voice-over comp.");
-            }
-        }
-        return comp;
+        return app.project.activeItem;
     }
 
-    function findSourceLayer(comp) {
+    function findSourceCandidate(comp) {
+        var candidate;
         var selected = comp.selectedLayers;
         for (var i = 0; i < selected.length; i += 1) {
-            if (!isSubtitleLayerName(selected[i]) && sourceFileFromLayer(selected[i])) {
-                return selected[i];
+            candidate = sourceCandidateFromLayer(selected[i], 0);
+            if (candidate) {
+                return candidate;
             }
         }
-        for (var index = 1; index <= comp.numLayers; index += 1) {
-            var layer = comp.layer(index);
-            if (sourceFileFromLayer(layer) && !isSubtitleLayerName(layer)) {
-                return layer;
-            }
+        candidate = scanCompForSourceCandidate(comp, 0);
+        if (candidate) {
+            return candidate;
         }
         throw new Error(buildNoSourceLayerMessage(comp));
     }
 
-    function sourceFileFromLayer(layer) {
+    function scanCompForSourceCandidate(comp, depth) {
+        for (var index = 1; index <= comp.numLayers; index += 1) {
+            var candidate = sourceCandidateFromLayer(comp.layer(index), depth);
+            if (candidate) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    function sourceCandidateFromLayer(layer, depth) {
         try {
             if (isUsableSourceLayer(layer)) {
-                return layer.source.file;
+                return {
+                    file: layer.source.file,
+                    timingLayers: [layer]
+                };
+            }
+            if (layer && !isSubtitleLayerName(layer) && layer.source instanceof CompItem && depth < MAX_NESTED_SOURCE_DEPTH) {
+                var nested = scanCompForSourceCandidate(layer.source, depth + 1);
+                if (nested) {
+                    nested.timingLayers.unshift(layer);
+                    return nested;
+                }
             }
         } catch (ignored) {
         }
@@ -182,6 +176,13 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
             if (!layer.source) {
                 return name + ": no source item";
             }
+            if (layer.source instanceof CompItem) {
+                var nested = scanCompForSourceCandidate(layer.source, 1);
+                if (nested) {
+                    return name + ": nested comp contains usable source (" + nested.file.fsName + ")";
+                }
+                return name + ": nested comp has no usable imported audio/video source";
+            }
             if (!layer.source.file) {
                 return name + ": source is not an imported file";
             }
@@ -197,72 +198,38 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
         }
     }
 
+    function validateCandidateTiming(candidate) {
+        for (var index = 0; index < candidate.timingLayers.length; index += 1) {
+            validateLayerTiming(candidate.timingLayers[index]);
+        }
+    }
+
     function validateLayerTiming(layer) {
         if (Math.abs(layer.startTime) > 0.001 || Math.abs(layer.inPoint) > 0.001 || Math.abs(layer.stretch - 100) > 0.001 || layer.timeRemapEnabled) {
-            throw new Error("MVP supports a source layer starting at comp time 0 with no trim, stretch, or time remap.");
+            throw new Error("MVP supports source/precomp layers starting at comp time 0 with no trim, stretch, or time remap.");
         }
     }
 
-    function runCli(sourcePath) {
-        var cliFile = getCliFile();
-        var command = getPythonCommand() + " " + shellQuote(cliFile.fsName) + " transcribe " + shellQuote(sourcePath) + " 2>&1";
+    function requestTranscription(sourcePath) {
+        var payload = "{\"source_path\":" + jsonQuote(sourcePath) + "}";
+        var command = "curl -sS -X POST -H 'Content-Type: application/json' --data " + shellQuote(payload) + " " + shellQuote(SERVER_URL + "/transcribe") + " 2>&1";
         var output = system.callSystem(command);
-        var payload = parseJsonOutput(output);
-        if (!payload.ok) {
-            throw new Error(payload.error || output || "Python CLI failed.");
+        var response = parseJsonOutput(output);
+        if (!response.ok) {
+            throw new Error(response.error || output || "AE Subtitle server failed.");
         }
-        if (!payload.transcript_path) {
-            throw new Error("Python CLI did not return transcript_path.");
+        if (!response.transcript_path) {
+            throw new Error("AE Subtitle server did not return transcript_path.");
         }
-        return payload;
-    }
-
-    function getCliFile() {
-        var saved = readSetting("cliPath", "");
-        if (saved) {
-            var savedFile = File(saved);
-            if (savedFile.exists) {
-                return savedFile;
-            }
-        }
-
-        var panelFile = File($.fileName);
-        var candidate = File(panelFile.parent.parent.fsName + "/python/aesubtitle/cli.py");
-        if (candidate.exists) {
-            saveSetting("cliPath", candidate.fsName);
-            return candidate;
-        }
-
-        return chooseCliFile();
-    }
-
-    function chooseCliFile() {
-        var file = File.openDialog("Select python/aesubtitle/cli.py", "*.py");
-        if (!file) {
-            throw new Error("Python CLI path is required.");
-        }
-        saveSetting("cliPath", file.fsName);
-        return file;
-    }
-
-    function choosePythonExecutable() {
-        var file = File.openDialog("Select Python executable", "*");
-        if (!file) {
-            return;
-        }
-        saveSetting("pythonPath", file.fsName);
-    }
-
-    function getPythonCommand() {
-        var saved = readSetting("pythonPath", "");
-        if (saved) {
-            return shellQuote(saved);
-        }
-        return "/usr/bin/env python3";
+        return response;
     }
 
     function shellQuote(value) {
         return "'" + String(value).replace(/'/g, "'\\''") + "'";
+    }
+
+    function jsonQuote(value) {
+        return "\"" + String(value).replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(/\r/g, "\\r").replace(/\n/g, "\\n") + "\"";
     }
 
     function parseJsonOutput(output) {
@@ -272,7 +239,7 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
         var start = output.indexOf("{");
         var end = output.lastIndexOf("}");
         if (start < 0 || end < start) {
-            throw new Error("Python CLI did not return JSON:\n" + output);
+            throw new Error("AE Subtitle server did not return JSON. Open AE Subtitle.command first.\n\n" + output);
         }
         return JSON.parse(output.substring(start, end + 1));
     }
@@ -345,17 +312,6 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
             text = "0" + text;
         }
         return text;
-    }
-
-    function readSetting(key, fallback) {
-        if (app.settings.haveSetting(SETTINGS_SECTION, key)) {
-            return app.settings.getSetting(SETTINGS_SECTION, key);
-        }
-        return fallback;
-    }
-
-    function saveSetting(key, value) {
-        app.settings.saveSetting(SETTINGS_SECTION, key, value);
     }
 
     var ui = buildUI(thisObj);

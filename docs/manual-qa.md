@@ -5,31 +5,22 @@ Run this checklist before merging user-facing subtitle generation changes.
 ## Prerequisites
 
 - Adobe After Effects is installed.
-- `ffmpeg` is installed and available from Terminal.
 - Python 3.10 or newer is installed.
-- Python dependencies are installed:
-
-```sh
-cd python
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -e ".[transcribe]"
-```
+- `AE Subtitle.command` is available in the repo root. It checks Python dependencies and `ffmpeg` before installing missing dependencies.
 
 ## Panel Install
 
 1. Copy `ae/AE Subtitle.jsx` into the After Effects `Scripts/ScriptUI Panels` folder.
 2. Restart After Effects.
-3. Open `Window > AE Subtitle`.
-4. Click `Python...` and select `python/.venv/bin/python` if `python3` from the default environment does not have the package installed.
-5. Click `CLI...` and select `python/aesubtitle/cli.py` if the panel does not find it automatically.
+3. Double-click `AE Subtitle.command` and keep the Terminal launcher open.
+4. Open `Window > AE Subtitle`.
 
 ## Test Comp
 
-1. Create or open a comp named `Voice-over`.
+1. Create or open any comp name.
 2. Import one short Thai or mixed Thai-English audio/video source.
 3. Put the source layer at comp time `0`.
-4. Do not trim, stretch, time-remap, or nest the source layer for MVP testing.
+4. Do not trim, stretch, or time-remap the source layer for MVP testing. A simple nested precomp is okay only when each timing layer starts at `0`.
 
 ## Checklist
 
@@ -57,4 +48,4 @@ python3 -m pip install -e ".[transcribe]"
 
 ## MVP Timing Limit
 
-MVP uses source seconds directly as comp seconds. A source layer that starts after `0`, is trimmed, stretched, or time-remapped should show a clear MVP timing error instead of generating misleading subtitle timing.
+MVP uses source seconds directly as comp seconds. A source layer or nested precomp layer that starts after `0`, is trimmed, stretched, or time-remapped should show a clear MVP timing error instead of generating misleading subtitle timing.

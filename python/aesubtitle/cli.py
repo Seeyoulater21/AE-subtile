@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import sys
+from argparse import Namespace
 from pathlib import Path
 from typing import Callable, TextIO
 
@@ -62,18 +63,42 @@ def _handle_transcribe(
     transcriber_factory: Callable[[argparse.Namespace], object] | None,
 ) -> dict[str, object]:
     source = Path(args.source).expanduser()
+    return transcribe_source(
+        source=source,
+        output=args.output,
+        model=args.model,
+        language=args.language,
+        device=args.device,
+        compute_type=args.compute_type,
+        force=args.force,
+        transcriber_factory=transcriber_factory,
+    )
+
+
+def transcribe_source(
+    source: str | Path,
+    output: str | Path | None = None,
+    model: str = "small",
+    language: str | None = None,
+    device: str = "auto",
+    compute_type: str = "default",
+    force: bool = False,
+    transcriber_factory: Callable[[argparse.Namespace], object] | None = None,
+) -> dict[str, object]:
+    source = Path(source).expanduser()
     if not source.exists():
         raise ValueError(f"Source media does not exist: {source}")
     if not source.is_file():
         raise ValueError(f"Source media is not a file: {source}")
 
-    cache_path = Path(args.output).expanduser() if args.output else transcript_cache_path(source)
-    if not args.force and cache_path.exists():
+    cache_path = Path(output).expanduser() if output else transcript_cache_path(source)
+    if not force and cache_path.exists():
         cached = load_transcript(cache_path)
         if cache_matches_source(cached, source):
             return {"ok": True, "transcript_path": str(cache_path), "cache_status": "hit"}
 
     factory = transcriber_factory or _default_transcriber_factory
+    args = Namespace(model=model, language=language, device=device, compute_type=compute_type)
     transcriber = factory(args)
     transcription = transcriber.transcribe(source)  # type: ignore[attr-defined]
     transcript = build_transcript(source, transcription)

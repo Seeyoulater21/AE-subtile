@@ -11,6 +11,12 @@ class PackagingTests(unittest.TestCase):
         if isinstance(readme, str):
             self.assertFalse(readme.startswith("../"), "setuptools rejects readme paths outside python/")
 
+    def test_python_pyproject_exposes_cli_and_server_scripts(self):
+        pyproject = tomllib.loads(Path("python/pyproject.toml").read_text(encoding="utf-8"))
+
+        self.assertEqual(pyproject["project"]["scripts"]["ae-subtitle"], "aesubtitle.cli:main")
+        self.assertEqual(pyproject["project"]["scripts"]["ae-subtitle-server"], "aesubtitle.server:main")
+
 
 if __name__ == "__main__":
     unittest.main()

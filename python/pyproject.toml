@@ -16,6 +16,7 @@ transcribe = [
 
 [project.scripts]
 ae-subtitle = "aesubtitle.cli:main"
+ae-subtitle-server = "aesubtitle.server:main"
 
 [tool.setuptools]
 packages = ["aesubtitle"]
