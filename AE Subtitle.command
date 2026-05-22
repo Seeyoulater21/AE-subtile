@@ -7,6 +7,9 @@ VENV_DIR="$ROOT_DIR/.venv"
 PYTHON_BIN="$VENV_DIR/bin/python"
 SERVER_HOST="${AESUBTITLE_HOST:-127.0.0.1}"
 SERVER_PORT="${AESUBTITLE_PORT:-8765}"
+TRANSCRIBE_MODEL="${AESUBTITLE_MODEL:-large-v3}"
+TRANSCRIBE_DEVICE="${AESUBTITLE_DEVICE:-auto}"
+TRANSCRIBE_COMPUTE_TYPE="${AESUBTITLE_COMPUTE_TYPE:-int8}"
 LOG_DIR="$ROOT_DIR/.aesubtitle/logs"
 SERVER_LOG="$LOG_DIR/server.log"
 
@@ -65,6 +68,18 @@ wait_for_enter() {
     IFS= read -r _
 }
 
+ensure_model_cache() {
+    printf "Checking transcription model: %s (%s, %s)\n" "$TRANSCRIBE_MODEL" "$TRANSCRIBE_DEVICE" "$TRANSCRIBE_COMPUTE_TYPE"
+    "$PYTHON_BIN" - "$TRANSCRIBE_MODEL" "$TRANSCRIBE_DEVICE" "$TRANSCRIBE_COMPUTE_TYPE" <<'PY'
+import sys
+
+from faster_whisper import WhisperModel
+
+model, device, compute_type = sys.argv[1:4]
+WhisperModel(model, device=device, compute_type=compute_type)
+PY
+}
+
 ensure_dependencies() {
     mkdir -p "$LOG_DIR"
     printf "AE Subtitle dependency check\n"
@@ -106,6 +121,13 @@ ensure_dependencies() {
         return 1
     fi
 
+    if ensure_model_cache; then
+        printf "Transcription model ready.\n"
+    else
+        printf "Could not prepare transcription model. Check internet connection or set AESUBTITLE_MODEL to an installed model.\n"
+        return 1
+    fi
+
     printf "Dependency check complete.\n"
     return 0
 }
@@ -113,7 +135,12 @@ ensure_dependencies() {
 start_server() {
     mkdir -p "$LOG_DIR"
     : >"$SERVER_LOG"
-    "$PYTHON_BIN" -m aesubtitle.server --host "$SERVER_HOST" --port "$SERVER_PORT" >>"$SERVER_LOG" 2>&1 &
+    "$PYTHON_BIN" -m aesubtitle.server \
+        --host "$SERVER_HOST" \
+        --port "$SERVER_PORT" \
+        --model "$TRANSCRIBE_MODEL" \
+        --device "$TRANSCRIBE_DEVICE" \
+        --compute-type "$TRANSCRIBE_COMPUTE_TYPE" >>"$SERVER_LOG" 2>&1 &
     SERVER_PID=$!
     SERVER_START_TIME=$(date +%s)
     SERVER_MODE="started"
@@ -236,6 +263,7 @@ draw_dynamic() {
     fi
 
     printf '\033[8;1H%bServer:%b http://%s:%s  %b[%s]%b  PID=%s  uptime=%s' "$WHITE" "$NC" "$SERVER_HOST" "$SERVER_PORT" "$mode_color" "$mode_label" "$NC" "${SERVER_PID:-none}" "$(uptime_label)"
+    printf '\033[9;1H%bModel:%b  %s  device=%s  compute=%s' "$WHITE" "$NC" "$TRANSCRIBE_MODEL" "$TRANSCRIBE_DEVICE" "$TRANSCRIBE_COMPUTE_TYPE"
     printf '\033[10;1H%b%s%b' "$DIM" "$LAST_STATUS" "$NC"
 
     local i
@@ -270,6 +298,9 @@ view_status() {
     printf 'URL:    http://%s:%s\n' "$SERVER_HOST" "$SERVER_PORT"
     printf 'PID:    %s\n' "${SERVER_PID:-none}"
     printf 'Mode:   %s\n' "$SERVER_MODE"
+    printf 'Model:  %s\n' "$TRANSCRIBE_MODEL"
+    printf 'Device: %s\n' "$TRANSCRIBE_DEVICE"
+    printf 'Compute:%s\n' "$TRANSCRIBE_COMPUTE_TYPE"
     printf 'Alive:  '
     if is_alive "$SERVER_PID"; then
         printf '%balive%b\n' "$GREEN" "$NC"

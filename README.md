@@ -32,7 +32,7 @@ AE Subtitle creates ordinary After Effects text layers from speech in the active
 ## Install
 
 1. Double-click `AE Subtitle.command`.
-2. The launcher checks Python, `aesubtitle`, `faster-whisper`, and `ffmpeg` before installing anything missing.
+2. The launcher checks Python, `aesubtitle`, `faster-whisper`, `ffmpeg`, and the configured Whisper model before installing or downloading anything missing.
 3. Edit `glossary.md` for the current campaign words if needed.
 4. Keep the launcher Terminal window open. It starts or adopts the local server at `http://127.0.0.1:8765`.
 5. Copy `ae/AE Subtitle.jsx` into the After Effects `Scripts/ScriptUI Panels` folder.

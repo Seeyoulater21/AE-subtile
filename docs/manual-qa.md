@@ -6,7 +6,7 @@ Run this checklist before merging user-facing subtitle generation changes.
 
 - Adobe After Effects is installed.
 - Python 3.10 or newer is installed.
-- `AE Subtitle.command` is available in the repo root. It checks Python dependencies and `ffmpeg` before installing missing dependencies.
+- `AE Subtitle.command` is available in the repo root. It checks Python dependencies, `ffmpeg`, and the configured Whisper model before installing or downloading missing pieces.
 - `glossary.md` contains the current campaign terms and common recognition mistakes.
 
 ## Panel Install
