@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aesubtitle"
+version = "0.1.0"
+description = "Local After Effects subtitle transcription helper"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+transcribe = [
+  "faster-whisper>=1.1.0",
+]
+
+[project.scripts]
+ae-subtitle = "aesubtitle.cli:main"
+ae-subtitle-server = "aesubtitle.server:main"
+
+[tool.setuptools]
+packages = ["aesubtitle"]

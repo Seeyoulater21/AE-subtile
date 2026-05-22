@@ -2,17 +2,18 @@
 
 ## System Overview
 
-AE Subtitle is a small After Effects ScriptUI panel plus a local Python CLI helper. It does not run a server in the MVP.
+AE Subtitle is a small After Effects ScriptUI panel plus a local Python helper. The Python side can run as a local-only server started by a macOS `.command` launcher, and still exposes a CLI for direct testing.
 
 ```text
 After Effects
   ScriptUI Panel (.jsx)
     |
-    | system.callSystem("python ... transcribe ...")
+    | system.callSystem("curl http://127.0.0.1:8765/transcribe ...")
     v
-Python CLI
+Python local server
   ffmpeg audio extraction
   Whisper-compatible transcription
+  campaign glossary correction
   sidecar JSON cache
     |
     v
@@ -29,21 +30,21 @@ After Effects Text Layers
 Purpose:
 - Provide a dockable After Effects panel with one primary action: `Generate Subtitle`.
 - Validate the active comp and source layer.
-- Call the Python CLI.
+- Call the local Python server. The user keeps `AE Subtitle.command` open while generating.
 - Parse transcript JSON.
 - Rebuild subtitle text layers.
 
 Responsibilities:
 - Find active comp.
-- Prefer comp named `Voice-over`; warn if active comp differs.
-- Find one usable layer with `layer.source.file.fsName`.
-- Build a shell-safe command for the Python CLI.
+- Accept any active comp name.
+- Find one usable layer with `layer.source.file.fsName`, or a simple nested precomp containing such a layer.
+- Build a shell-safe `curl` command for the local server.
 - Delete existing layers whose names start with `SUB `.
 - Create one text layer per transcript segment.
 - Apply default paragraph, position, color, and stroke/shadow settings.
 - Report success or clear errors to the user.
 
-### Python CLI
+### Python Server / CLI
 
 Purpose:
 - Keep Whisper and ffmpeg work outside ExtendScript.
@@ -54,9 +55,22 @@ Responsibilities:
 - Reuse sidecar cache when source fingerprint matches.
 - Extract audio with ffmpeg when needed.
 - Transcribe Thai and English speech with a local Whisper-compatible engine.
+- Apply editable campaign glossary corrections from Markdown.
 - Clean segment text.
 - Write transcript JSON atomically.
 - Print JSON path or machine-readable status for the JSX caller.
+
+### macOS Launcher
+
+Purpose:
+- Let the user double-click `AE Subtitle.command`, check/install dependencies, start/adopt the local server, view status, and view logs.
+
+Responsibilities:
+- Create `.venv` only when missing.
+- Install Python dependencies only when `aesubtitle` or `faster_whisper` is missing.
+- Check `ffmpeg` before attempting installation.
+- Start `python -m aesubtitle.server` on `127.0.0.1:8765`.
+- Keep the Terminal window open while the user clicks `Generate Subtitle` in After Effects.
 
 ### Transcript Cache
 
@@ -81,6 +95,11 @@ Contract:
   "duration_seconds": 30.0,
   "language": "th",
   "model": "large-v3",
+  "glossary_fingerprint": {
+    "path": "/path/to/glossary.md",
+    "size_bytes": 1234,
+    "modified_at": "2026-05-22T10:00:00Z"
+  },
   "timebase": "source_seconds",
   "segments": [
     {
@@ -93,11 +112,13 @@ Contract:
 }
 ```
 
+If `glossary.md` exists, the Python side applies it before writing the cache and stores its fingerprint. Changing the glossary invalidates the cache.
+
 ## Timing Model
 
 MVP uses source seconds directly as comp seconds.
 
-This is valid when the comp contains the voice-over source starting at comp time `0`, with no time remap, speed change, or nested offset. More complex mapping is deferred.
+This is valid when the active comp contains the voice-over source starting at comp time `0`, with no time remap, speed change, trim, or nested offset. A simple nested comp is supported only when each timing layer also starts at `0` with normal speed. More complex mapping is deferred.
 
 ## Text Layer Model
 
@@ -109,6 +130,19 @@ Each transcript segment becomes one ordinary text layer:
 - Source text: wrapped segment text.
 - Position: bottom center.
 - Style: white fill, black stroke or shadow.
+
+## Campaign Glossary
+
+The root `glossary.md` file uses a small Markdown format:
+
+```md
+- canonical: Shopee Payday
+  variants:
+    - shopee payday
+    - ชอบพี่เพเด
+```
+
+`canonical` is the text that should appear in subtitles. `variants` are exact model mistakes or alternate spellings. After exact replacements, a conservative fuzzy pass can correct near Thai matches such as `ทั่วชัย` to `ทั่วไทย` when the glossary contains `ทั่วไทย`.
 
 ## Suggested Future File Structure
 
@@ -138,4 +172,3 @@ docs/
 ## CI Position
 
 Do not create placeholder CI before implementation exists. Add CI in the foundation issue once Python package and smoke tests exist.
-
