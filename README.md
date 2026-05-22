@@ -27,6 +27,41 @@ AE Subtitle creates ordinary After Effects text layers from speech in a `Voice-o
 - Text wrapping: up to two readable lines per segment, without changing Whisper segment timing.
 - Repeat generation: remove only `SUB ` layers, then rebuild.
 
+## Install
+
+1. Install `ffmpeg`.
+2. Create the local Python environment:
+
+```sh
+cd python
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -e ".[transcribe]"
+```
+
+3. Copy `ae/AE Subtitle.jsx` into the After Effects `Scripts/ScriptUI Panels` folder.
+4. Restart After Effects and open `Window > AE Subtitle`.
+5. If needed, click `Python...` and select `python/.venv/bin/python`.
+6. If needed, click `CLI...` and select `python/aesubtitle/cli.py`.
+
+## CLI Usage
+
+```sh
+PYTHONPATH=python python3 -m aesubtitle transcribe "/path/to/voice over.wav"
+```
+
+The CLI prints machine-readable JSON:
+
+```json
+{"ok": true, "transcript_path": "/path/to/voice over.aesubtitle.json", "cache_status": "generated"}
+```
+
+Repeated runs reuse the sidecar transcript cache when source file size and modified time still match.
+
+## Manual QA
+
+See `docs/manual-qa.md`.
+
 ## Non-Goals
 
 - No cloud transcription.
@@ -40,4 +75,3 @@ AE Subtitle creates ordinary After Effects text layers from speech in a `Voice-o
 ## Related Reference
 
 This project borrows the local Whisper and transcript JSON ideas from the sibling project `Thai-Text-Based-Editing-tool`, but the integration target is After Effects and the UI is much smaller.
-
