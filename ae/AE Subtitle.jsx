@@ -11,13 +11,18 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
     var SUPPORTED_SOURCE_EXTENSIONS = {
         "aif": true,
         "aiff": true,
+        "aac": true,
         "avi": true,
+        "flac": true,
         "m4a": true,
         "m4v": true,
         "mkv": true,
         "mov": true,
         "mp3": true,
         "mp4": true,
+        "ogg": true,
+        "webm": true,
+        "wma": true,
         "wav": true
     };
 
@@ -111,7 +116,7 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
     function findSourceLayer(comp) {
         var selected = comp.selectedLayers;
         for (var i = 0; i < selected.length; i += 1) {
-            if (sourceFileFromLayer(selected[i])) {
+            if (!isSubtitleLayerName(selected[i]) && sourceFileFromLayer(selected[i])) {
                 return selected[i];
             }
         }
@@ -121,17 +126,21 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
                 return layer;
             }
         }
-        throw new Error("No imported audio/video source file found in the active comp.");
+        throw new Error(buildNoSourceLayerMessage(comp));
     }
 
     function sourceFileFromLayer(layer) {
         try {
-            if (layer && layer.source && layer.source.file && layer.source.file.exists && (layer.hasAudio || isLikelyMediaSource(layer.source.file))) {
+            if (isUsableSourceLayer(layer)) {
                 return layer.source.file;
             }
         } catch (ignored) {
         }
         return null;
+    }
+
+    function isUsableSourceLayer(layer) {
+        return layer && !isSubtitleLayerName(layer) && layer.source && layer.source.file && layer.source.file.exists && (layer.hasAudio || isLikelyMediaSource(layer.source.file));
     }
 
     function isLikelyMediaSource(file) {
@@ -142,6 +151,50 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
         }
         var extension = name.substring(dotIndex + 1);
         return SUPPORTED_SOURCE_EXTENSIONS[extension] === true;
+    }
+
+    function buildNoSourceLayerMessage(comp) {
+        var message = "No usable imported audio/video source layer found in the active comp.\n\n";
+        message += "Put an imported audio or video file layer inside \"" + comp.name + "\" at comp time 0, then run Generate Subtitle again.";
+        message += "\n\nScanned layers:";
+        if (comp.numLayers === 0) {
+            return message + "\n- none";
+        }
+        var maxLayersToShow = Math.min(comp.numLayers, 8);
+        for (var index = 1; index <= maxLayersToShow; index += 1) {
+            message += "\n- " + describeLayerForSourceScan(comp.layer(index));
+        }
+        if (comp.numLayers > maxLayersToShow) {
+            message += "\n- ... " + (comp.numLayers - maxLayersToShow) + " more layer(s)";
+        }
+        return message;
+    }
+
+    function describeLayerForSourceScan(layer) {
+        if (!layer) {
+            return "Unknown layer: not available";
+        }
+        var name = "\"" + layer.name + "\"";
+        if (isSubtitleLayerName(layer)) {
+            return name + ": skipped generated subtitle layer";
+        }
+        try {
+            if (!layer.source) {
+                return name + ": no source item";
+            }
+            if (!layer.source.file) {
+                return name + ": source is not an imported file";
+            }
+            if (!layer.source.file.exists) {
+                return name + ": source file is missing on disk (" + layer.source.file.fsName + ")";
+            }
+            if (layer.hasAudio || isLikelyMediaSource(layer.source.file)) {
+                return name + ": usable source (" + layer.source.file.fsName + ")";
+            }
+            return name + ": imported file is not recognized as audio/video (" + layer.source.file.fsName + ")";
+        } catch (error) {
+            return name + ": could not inspect layer source (" + error.message + ")";
+        }
     }
 
     function validateLayerTiming(layer) {

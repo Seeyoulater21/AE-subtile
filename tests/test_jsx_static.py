@@ -14,6 +14,8 @@ class JsxStaticTests(unittest.TestCase):
         self.assertIn("function isSubtitleLayerName", source)
         self.assertIn("SUPPORTED_SOURCE_EXTENSIONS", source)
         self.assertIn("function isLikelyMediaSource", source)
+        self.assertIn("function describeLayerForSourceScan", source)
+        self.assertIn("Scanned layers:", source)
         self.assertIn("SUBTITLE_PREFIX", source)
         self.assertIn("layer.name.indexOf(SUBTITLE_PREFIX) === 0", source)
         self.assertNotIn('layer.name.indexOf("SUB") === 0', source)
