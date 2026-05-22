@@ -8,6 +8,18 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
     var SETTINGS_SECTION = "AE Subtitle";
     var SUBTITLE_PREFIX = "SUB ";
     var VOICE_OVER_COMP_NAME = "Voice-over";
+    var SUPPORTED_SOURCE_EXTENSIONS = {
+        "aif": true,
+        "aiff": true,
+        "avi": true,
+        "m4a": true,
+        "m4v": true,
+        "mkv": true,
+        "mov": true,
+        "mp3": true,
+        "mp4": true,
+        "wav": true
+    };
 
     function buildUI(container) {
         var panel = container instanceof Panel ? container : new Window("palette", SCRIPT_NAME, undefined, { resizeable: true });
@@ -28,8 +40,20 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
         generateButton.onClick = function () {
             runGenerate(statusText);
         };
-        pythonButton.onClick = choosePythonExecutable;
-        cliButton.onClick = chooseCliFile;
+        pythonButton.onClick = function () {
+            try {
+                choosePythonExecutable();
+            } catch (error) {
+                alert("AE Subtitle error:\n" + error.message);
+            }
+        };
+        cliButton.onClick = function () {
+            try {
+                chooseCliFile();
+            } catch (error) {
+                alert("AE Subtitle error:\n" + error.message);
+            }
+        };
 
         panel.layout.layout(true);
         panel.layout.resize();
@@ -102,12 +126,22 @@ Dockable ScriptUI panel for generating editable subtitle text layers from a Voic
 
     function sourceFileFromLayer(layer) {
         try {
-            if (layer && layer.source && layer.source.file && layer.source.file.exists) {
+            if (layer && layer.source && layer.source.file && layer.source.file.exists && (layer.hasAudio || isLikelyMediaSource(layer.source.file))) {
                 return layer.source.file;
             }
         } catch (ignored) {
         }
         return null;
+    }
+
+    function isLikelyMediaSource(file) {
+        var name = String(file.name).toLowerCase();
+        var dotIndex = name.lastIndexOf(".");
+        if (dotIndex < 0) {
+            return false;
+        }
+        var extension = name.substring(dotIndex + 1);
+        return SUPPORTED_SOURCE_EXTENSIONS[extension] === true;
     }
 
     function validateLayerTiming(layer) {
